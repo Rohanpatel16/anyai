@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chat with Apify & OpenRouter</title>
+    <style>
+        :root {
+            --background-color: #f4f7f9;
+            --container-bg: #ffffff;
+            --text-color: #333;
+            --border-color: #e0e0e0;
+            --accent-color: #007bff;
+            --accent-hover: #0056b3;
+            --user-msg-bg: #007bff;
+            --ai-msg-bg: #e9ecef;
+            --user-msg-text: #ffffff;
+            --ai-msg-text: #333;
+            --input-bg: #f8f9fa;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        main {
+            width: 100%;
+            max-width: 700px;
+            background: var(--container-bg);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 85vh;
+        }
+        header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            text-align: center;
+        }
+        header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+        .config-section {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .config-section p {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 0;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            box-sizing: border-box;
+            background-color: var(--input-bg);
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            background-color: var(--accent-color);
+            color: white;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: var(--accent-hover);
+        }
+        button:disabled {
+            background-color: #a0a0a0;
+            cursor: not-allowed;
+        }
+        .chat-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .message {
+            max-width: 80%;
+            padding: 10px 15px;
+            border-radius: 18px;
+            margin-bottom: 10px;
+            line-height: 1.4;
+        }
+        .user-message {
+            background-color: var(--user-msg-bg);
+            color: var(--user-msg-text);
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+        .ai-message {
+            background-color: var(--ai-msg-bg);
+            color: var(--ai-msg-text);
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+        .thinking {
+            font-style: italic;
+            color: #888;
+        }
+        .error-message {
+            background-color: #ffebee;
+            color: #c62828;
+            align-self: center;
+            font-weight: bold;
+        }
+        .chat-input-form {
+            display: flex;
+            padding: 20px;
+            border-top: 1px solid var(--border-color);
+        }
+        .chat-input-form input {
+            flex-grow: 1;
+            padding: 10px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            margin-right: 10px;
+            background-color: var(--input-bg);
+        }
+        .chat-input-form button {
+            width: auto;
+            padding: 10px 20px;
+            border-radius: 20px;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <main>
+        <header>
+            <h1>AI Chat</h1>
+        </header>
+
+        <section id="config-section" class="config-section">
+            <p>Enter your Apify Token and choose a model to begin. Your token is only used in your browser and is not stored anywhere.</p>
+            <form id="config-form">
+                <div class="input-group">
+                    <label for="api-key">Apify Token</label>
+                    <input type="password" id="api-key" placeholder="Enter your Apify Token" required>
+                </div>
+                <div class="input-group">
+                    <label for="model-name">AI Model Name</label>
+                    <input type="text" id="model-name" placeholder="e.g., openrouter/auto" value="openrouter/auto" required>
+                </div>
+                <button type="submit">Start Chat</button>
+            </form>
+        </section>
+
+        <div id="chat-container" class="chat-container hidden">
+            <!-- Chat messages will be appended here -->
+        </div>
+
+        <form id="chat-form" class="chat-input-form hidden">
+            <input type="text" id="chat-input" placeholder="Type your message..." autocomplete="off" required>
+            <button type="submit">Send</button>
+        </form>
+    </main>
+
+    <script>
+        // DOM Elements
+        const configSection = document.getElementById('config-section');
+        const configForm = document.getElementById('config-form');
+        const chatContainer = document.getElementById('chat-container');
+        const chatForm = document.getElementById('chat-form');
+        const apiKeyInput = document.getElementById('api-key');
+        const modelInput = document.getElementById('model-name');
+        const chatInput = document.getElementById('chat-input');
+        const chatSubmitButton = chatForm.querySelector('button');
+
+        // App State
+        let apifyToken = '';
+        let modelName = '';
+        const API_URL = 'https://openrouter.apify.actor/api/v1/chat/completions';
+
+        // --- Event Listeners ---
+
+        configForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            apifyToken = apiKeyInput.value.trim();
+            modelName = modelInput.value.trim();
+
+            if (apifyToken && modelName) {
+                configSection.classList.add('hidden');
+                chatContainer.classList.remove('hidden');
+                chatForm.classList.remove('hidden');
+                addMessage('AI', `Hello! I'm ready to chat using the <strong>${modelName}</strong> model.`);
+            }
+        });
+
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const userMessage = chatInput.value.trim();
+            if (!userMessage) return;
+
+            addMessage('User', userMessage);
+            chatInput.value = '';
+            chatSubmitButton.disabled = true;
+
+            const thinkingMessage = addMessage('AI', '...', ['thinking']);
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apifyToken}`
+                    },
+                    body: JSON.stringify({
+                        model: modelName,
+                        messages: [{ role: 'user', content: userMessage }]
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error.message || `HTTP error! Status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                const aiResponse = data.choices[0].message.content;
+                
+                thinkingMessage.remove();
+                addMessage('AI', aiResponse);
+
+            } catch (error) {
+                console.error("API Error:", error);
+                thinkingMessage.remove();
+                addMessage('Error', `Sorry, something went wrong: ${error.message}`, ['error-message']);
+            } finally {
+                chatSubmitButton.disabled = false;
+                chatInput.focus();
+            }
+        });
+
+        // --- Helper Functions ---
+
+        function addMessage(sender, text, classes = []) {
+            const messageElement = document.createElement('div');
+            const messageClass = sender === 'User' ? 'user-message' : 'ai-message';
+            messageElement.classList.add('message', messageClass, ...classes);
+            messageElement.innerHTML = text; // Use innerHTML to render bold tags etc.
+            chatContainer.appendChild(messageElement);
+            chatContainer.scrollTop = chatContainer.scrollHeight; // Auto-scroll to bottom
+            return messageElement;
+        }
+    </script>
+</body>
+</html>
