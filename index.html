@@ -164,7 +164,6 @@
             <form id="config-form">
                 <div class="input-group">
                     <label for="api-key">Apify Token</label>
-                    <!-- FIX 2: Added autocomplete attribute -->
                     <input type="password" id="api-key" placeholder="Enter your Apify Token" autocomplete="current-password" required>
                 </div>
                 <div class="input-group">
@@ -200,10 +199,9 @@
         let apifyToken = '';
         let modelName = '';
         
-        // --- FIX 1: Use a CORS Proxy ---
-        const PROXY_URL = 'https://corsproxy.io/?';
+        // --- FIX: Use a more robust CORS Proxy ---
         const TARGET_API_URL = 'https://openrouter.apify.actor/api/v1/chat/completions';
-        const API_URL = PROXY_URL + encodeURIComponent(TARGET_API_URL);
+        const API_URL = `https://thingproxy.freeboard.io/fetch/${TARGET_API_URL}`;
 
         // --- Event Listeners ---
 
@@ -245,8 +243,18 @@
                 });
 
                 if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error.message || `HTTP error! Status: ${response.status}`);
+                    // Try to get a more detailed error message from the response body
+                    let errorText = `HTTP error! Status: ${response.status}`;
+                    try {
+                        const errorData = await response.json();
+                        if (errorData.error && errorData.error.message) {
+                            errorText = errorData.error.message;
+                        }
+                    } catch (jsonError) {
+                        // If the response is not JSON, use the status text
+                        errorText = response.statusText;
+                    }
+                    throw new Error(errorText);
                 }
 
                 const data = await response.json();
